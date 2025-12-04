@@ -1,5 +1,11 @@
 import numpy as np
 import time
+import pandas as pd
+
+class NoPathFoundError(Exception):
+    def __init__(self,message):
+        self.message=message
+        super().__init__(self.message)
 
 def is_accessible(i,j,M):#Renvoie Vrai si accessible, Faux sinon
     return not M[max(0,i-1):min(i,M.shape[0]-1)+1,max(0,j-1):min(j,M.shape[1]-1)+1].sum()
@@ -59,25 +65,37 @@ def dijkstra(start_node,dico_node):
 
     #Itération
     while len(Q)!=0:
+        path_found=False
+
+        #Trouver lle nœud le plus proche parmi tous ceux accessibles
         min_dist=np.inf
         for node in Q:
             if distances_to_node[dico_idx[node]]<min_dist:
+                path_found=True#booléen pour vérifier si un nouveau chemin a été trouvé
                 min_dist=distances_to_node[dico_idx[node]]
                 curr_node=node
                 curr_node_idx=dico_idx[curr_node]
                 curr_node_dist=distances_to_node[dico_idx[curr_node]]
-        Q.remove(curr_node)
-
-        for neigh_node in dico_node[curr_node]:
-            if distances_to_node[dico_idx[neigh_node]]>curr_node_dist+1:#Tous les poids sont de 1 dans ce graphe
-                distances_to_node[dico_idx[neigh_node]]=curr_node_dist+1
-                predecessor_list[dico_idx[neigh_node]]=curr_node_idx
+        
+        if path_found:
+            Q.remove(curr_node)
+        
+            for neigh_node in dico_node[curr_node]:
+                if distances_to_node[dico_idx[neigh_node]]>curr_node_dist+1:#Tous les poids sont de 1 dans ce graphe
+                    distances_to_node[dico_idx[neigh_node]]=curr_node_dist+1
+                    predecessor_list[dico_idx[neigh_node]]=curr_node_idx
+        
+        else:#Plus de nœuds accessibles dans la composante connexe du nœud de départ, c'est un problème si on cherche le chemin entre
+            print("\033[93mPlusieurs composantes connexes dans le graphe\033[0m")
+            break
     
     return distances_to_node,predecessor_list
 
 def get_path_to(end_node,predecessor_list,dico_node):
     node_list=list(dico_node.keys())
     end_node_idx=node_list.index(end_node)
+    if predecessor_list[end_node_idx]==-1:
+        raise NoPathFoundError(f"Pas de chemin existant vers le nœud recherché {end_node}")
     path=[predecessor_list[end_node_idx]]
     while path[-1]!=pred[path[-1]]:
         path.append(pred[path[-1]])
@@ -113,44 +131,59 @@ def create_adjacency_matrix(adjacency_dictionnary):
         
 
 # lecture fichier d'entrée
-def read_matrix(file="input_file.txt"):
-    with open(file, "r") as f:
-        file = f.readlines()
+def read_matrix(nom_fichier):
+    grilles = []
 
-        for i, line in enumerate(file):
-            if i == 0:
-                line = line.split(" ")
-                line = list(map(int, line))
-                m, n = int(line[0]), int(line[1])
-                matrix = np.zeros(shape=(m, n))
+    with open(nom_fichier, "r") as f:
+        while True:
+            ligne = f.readline()
+            # On assure la fin de la boucle à la fin du fichier
+            if not ligne:
+                break
 
-            elif i <= m:
-                line = line.split(" ")
-                line = list(map(int, line))
-                matrix[i - 1] = line
+            # On s'assure de passer une ligne si elle est vide (normalement inutile)
+            ligne = ligne.strip()
+            if not ligne:
+                continue
+            
+            if ligne[0]=='#':# Ignorer les commentaires
+                continue
+            # Lecture matrice
+            largeur, hauteur = map(int, ligne.split())
+            matrice = np.zeros(shape=(largeur, hauteur))
+            for i in range(hauteur):
+                ligne_vals = list(map(int, f.readline().split()))
+                matrice[i] = ligne_vals
 
-            elif i == m + 1:
-                line = [val.strip() for val in line.split(" ")]
-                start = [line[0], line[1]]
-                end = [line[2], line[3]]
-                if line[4] == "nord":
-                    start.append(0)
-                elif line[4] == "ouest":
-                    start.append(1)
-                elif line[4] == "sud":
-                    start.append(2)
-                elif line[4] == "est":
-                    start.append(3)
-                else:
-                    print("erreur de direction")
-                start = list(map(int, start))
-                end = list(map(int, end))
+            # Lecture start end et orientation
+            params = f.readline().split()
+            li_start, col_start, li_end, col_end = map(int, params[:4])
+            orientation = params[4]
+            start, end = [li_start, col_start], [li_end, col_end]
+
+            if orientation == "nord":
+                start.append(0)
+            elif orientation == "ouest":
+                start.append(1)
+            elif orientation == "sud":
+                start.append(2)
+            elif orientation == "est":
+                start.append(3)
             else:
-                pass
-    return np.array(matrix, dtype=int), start, end
+                print(
+                    f"erreur direction : {orientation} \n, start : {start}, end : {end}"
+                )
+
+            # ligne séparatrice (0 0)
+            f.readline()
+
+            grilles.append((matrice, start, end))
+
+    return grilles 
 
 # ================ Main ====================
 if __name__=="__main__":
+    """
     start_time=time.time()
     matrix, start, end = read_matrix()
     start=tuple(start)
@@ -174,3 +207,40 @@ if __name__=="__main__":
     #print(get_path_textual(get_path_to((0,0,0))))
     end_time=time.time()
     print(f"{end_time-start_time}s")
+    """
+
+    grilles = read_matrix("input_file_test_obstacle.txt")
+    time_iter = pd.DataFrame(columns=["size", "time"])
+    
+    error_list=[]
+    for i in range(len(grilles)):
+        size = len(grilles[i][0])
+        start_time, end_time = 0, 0
+        start_time = time.perf_counter()
+
+        matrix, start, end = (
+            grilles[i][0],  # matrix
+            grilles[i][1],  # start
+            grilles[i][2],  # end
+        )
+        start = tuple(start)
+
+        Mres = create_accessibility_matrix(matrix)
+        dico = create_adjacency_dictionnary(Mres, end)
+
+        try:
+            d, pred = dijkstra(start, dico)
+            path = get_path_to((-1, -1, -1), pred, dico)  # Nœud fictif représentant le point final
+            print(get_path_textual(path))
+        except NoPathFoundError:
+            error_list.append((Mres,start,end))
+
+        end_time = time.perf_counter()
+        execution_time = end_time - start_time
+
+        time_iter = pd.concat(
+            [time_iter, pd.DataFrame([[size, execution_time]], columns=time_iter.columns)],
+            ignore_index=True,
+        )
+        print(f"{time_iter}") 
+    print(len(error_list))

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import time
 import os
+import plotly.express as px
 
 class NoPathFoundError(Exception):
     def __init__(self,message):
@@ -241,6 +242,17 @@ def read_matrix(nom_fichier):
     return grilles
 
 def get_time_iter(grilles, obstacles=False):
+    """
+    Renvoie une matrice du temps d'exécution en fonction de la grille d'entrée et une liste des plus courts chemin
+    
+    Args:
+        grilles (list): liste des grilles sous la forme[(numpy.ndarray,tuple,tuple)*]
+        obstacles (bool): indique si les grilles d'entrée permettent de tester la taille ou le nombre d'obstacles
+
+    Returns:
+        time_iter (DataFrame): deux colonnes "N" et "time"
+        chemin (list): list de str
+    """
     chemin = []
 
     time_iter = pd.DataFrame(columns=["N", "time"])
@@ -288,9 +300,15 @@ def get_time_iter(grilles, obstacles=False):
         time_iter.loc[len(time_iter)]=[size,execution_time]
     return time_iter, chemin
 
-"""
-#À quoi ça sert?
+
 def draw_boxplot(time_iter, obstacle=False):
+    """
+    Affiche les boxplots correspondant à chacune des valeurs de N dans le DataFrame d'entrée
+    
+    Args:
+        time_iter (DataFrame): deux colonnes "N" et "time"
+        obstacles (bool): indique si les grilles d'entrée permettent de tester la taille ou le nombre d'obstacles
+    """
     if obstacle:
         fig = px.box(
             time_iter,
@@ -306,9 +324,16 @@ def draw_boxplot(time_iter, obstacle=False):
             title="Temps d'execution en fonction de la taille de la grille",
         )
     fig.show()
-"""
+
     
 def create_output_file(file_path, chemin):
+    """
+    Créer un fichier avec tous les plus cours chemins
+    
+    Args:
+        nom_fichier (str): chemin vers le fichier
+        chemin (list): list de str
+    """
     file = os.path.basename(file_path)
     with open(file, "w") as f:
         for row in chemin:

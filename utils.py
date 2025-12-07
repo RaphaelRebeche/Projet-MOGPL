@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import time
 import os
+import heapq
+import plotly.express as px
 
 class NoPathFoundError(Exception):
     def __init__(self,message):
@@ -83,13 +85,15 @@ def create_adjacency_dictionnary(accessibility_matrix,end_point):
 def dijkstra(start_node,dico_node):
     """
     Calcul des distances entre un point et tous ceux qui lui sont accessible
+    Complexité de O((A+S) log S)
+    avec A le nombre d'arêtes et S le nombre de sommets
     
     Args:
         start_node (tuple): coordonnées du point de début
         dico_node (dict): dictionnaire de la forme {(i,j,o) : [(i',j',o')*]})
 
     Returns:
-        distances_to_node (list): distances par rapport au point de départ
+        distances_to_node (list): distance (en seconde) par rapport au point de départ
         predecessor_list (list): liste d'entiers qui à l'index i a pour valeur l'index i' du nœud qui le précède
             Si predecessor_list[i]==i, cela veut dire que i est le point de départ
     """
@@ -105,25 +109,18 @@ def dijkstra(start_node,dico_node):
     predecessor_list[dico_idx[start_node]]=dico_idx[start_node]
     
     visited_nodes=np.zeros(len(node_list),dtype=bool)
+    min_heap=[(0,dico_idx[start_node])]#tas de tuples comportant les distances et index des nœuds
 
     #Itérations
-    while True:
+    while len(min_heap)!=0:
 
-        #Trouver le nœud le plus proche parmi tous ceux accessibles
-        min_dist=np.inf
-        curr_node_idx=-1
+        #Suppression du minimum (O(log(n)))
+        curr_node_dist,curr_node_idx=heapq.heappop(min_heap)
+        if visited_nodes[curr_node_idx]:#Si le nœud a déjà été visité, on passe au suivant
+            continue
 
-        for idx in range(len(distances_to_node)):
-            if not visited_nodes[idx] and distances_to_node[idx]<min_dist:
-                min_dist=distances_to_node[idx]
-                curr_node_idx=idx
-        
-        if curr_node_idx==-1:#Si plusieurs composantes connexes ou graphe complètement visité
-            break
-        
         visited_nodes[curr_node_idx]=True
         curr_node=node_list[curr_node_idx]
-        curr_node_dist=distances_to_node[curr_node_idx]
 
         for neigh_node in dico_node[curr_node]:
             neigh_node_idx=dico_idx[neigh_node]
@@ -132,6 +129,8 @@ def dijkstra(start_node,dico_node):
             if new_dist<distances_to_node[neigh_node_idx]:#Tous les poids sont de 1 dans ce graphe
                 distances_to_node[neigh_node_idx]=new_dist
                 predecessor_list[neigh_node_idx]=curr_node_idx
+                #Insetrion d'une nouvelle distance (O(log(n)))
+                heapq.heappush(min_heap,(new_dist,neigh_node_idx))
     
     return distances_to_node,predecessor_list
 
@@ -240,6 +239,121 @@ def read_matrix(nom_fichier):
 
     return grilles
 
+def create_random_matrix_start_end(N=20, P_obstacle=False):
+    """
+    Renvoie une matrice carré de 0 et 1 placés aléatoirement et une liste avec le point de départ, son orientation et le point d'arrivée
+
+    Args:
+    N(int): la taille d'un côté ou le nombre d’obstacles
+    P_obstacle(bool): True => N est la taille d'un côté, False => N est le nombre d'obstacles
+
+    Return:
+    matrix (2D list): matrice de 0 et 1 pour les obstacles
+    start_end (list): coordonée des point de départ (avec orientation) et sortie
+    """
+    # Creation de la matrice aleatoire =================================================
+    if not P_obstacle:  # pour test en fonction de la taille ------------
+        matrix = np.eye(N, dtype=int).flatten()
+
+    else:  # pour le test en fonction du nombre d'obstacles -------------
+        matrice_obstacles = np.arange(P_obstacle) * 0 + 1
+        matrice_accessible = np.arange(N**2 - P_obstacle) * 0
+        matrix = np.hstack([matrice_obstacles, matrice_accessible])
+
+    np.random.shuffle(matrix)
+    matrix = matrix.reshape(N, N)
+
+    # Creation du point start ==========================================================
+    start = [
+        np.random.randint(1, N + 1),
+        np.random.randint(1, N + 1),
+    ]
+    while not is_accessible(
+        start[0], start[1], matrix
+    ):  # verification absence d'obstacle sur start ---------------------
+        start = [
+            np.random.randint(1, N + 1),
+            np.random.randint(1, N + 1),
+        ]
+
+    # Creation du point stop ===========================================================
+    end = [np.random.randint(1, N + 1), np.random.randint(1, N + 1)]
+    while (
+        end == start or not is_accessible(end[0], end[1], matrix) == 1
+    ):  # verification absence d'obstacle sur stop et stop != start-------
+        end = [np.random.randint(1, N + 1), np.random.randint(1, N + 1)]
+
+    # Ajout de l'orientation ===========================================================
+    deux_points = np.hstack([start, end])
+    ori = np.random.randint(0, 4)
+
+    # converstion de 0,1,2,3 en nord, ouest, sud, est---------------------
+    if ori == 0:
+        ori = "nord"
+    elif ori == 1:
+        ori = "ouest"
+    elif ori == 2:
+        ori = "sud"
+    elif ori == 3:
+        ori = "est"
+    else:
+        return f"mauvaise valeure pour la direction N/S/E/O : ori = {ori}"
+
+    start_end = np.hstack([deux_points, ori])
+
+    return matrix, start_end
+
+def append_matrix_to_file(matrix, start_end, file_name):
+    """
+    Ajoute une matrice à un fichier d'entrée
+
+    Args:
+    matrix (2D list): matrice de 0 et 1 pour les obstacles
+    start_end (list): coordonée des points de départ (avec orientation) et sortie
+    """
+    n = len(matrix)
+    with open(file_name, "a") as f:
+        # ajout dimension fichier
+        f.write(f"{n} {n}\n")
+        # ajout matrice ligne à ligne
+        for row in matrix:
+            f.write(" ".join(map(str, row)) + "\n")
+
+        # ajout position
+        f.write(" ".join(map(str, start_end)) + "\n")
+
+        # ajout 0 0 final
+        f.write("0 0\n")
+
+def create_file_test(name,obstacle=False):
+    """
+    Créer un fichier avec toutes les matrices de tests
+    Args :
+    obstacle(bool) : idem que create_random_matric_start_end
+    """
+    with open(name, "w") as f:#Efface le contenu du fichier si il existe déjà
+        pass
+    sizes = np.arange(1, 6) * 10
+    for N in sizes:
+        for _ in range(10):
+            if not obstacle:
+                random_matrix, random_points = create_random_matrix_start_end(N)
+                append_matrix_to_file(
+                    random_matrix,
+                    random_points,
+                    file_name=name
+                )
+
+            else:
+                random_matrix, random_points = create_random_matrix_start_end(
+                    P_obstacle=N,
+                )
+                append_matrix_to_file(
+                    random_matrix,
+                    random_points,
+                    file_name=name
+                )
+
 def get_time_iter(grilles, obstacles=False):
     chemin = []
 
@@ -269,7 +383,7 @@ def get_time_iter(grilles, obstacles=False):
         try:
             _, pred = dijkstra(start, dico)
             path = get_path_to(
-                (-1, -1, -1), pred, dico
+                (-1,-1,-1), pred, dico
             )  # Nœud fictif représentant le point final
             chemin.append(f"{get_path_textual(path)} ")
 
@@ -278,45 +392,50 @@ def get_time_iter(grilles, obstacles=False):
             continue
 
         _, pred = dijkstra(start, dico)
-        path = get_path_to(
-            (-1, -1, -1), pred, dico
-        )  # as (-1, -1, -1) is our fictif point
-        # print(path)
+        path = get_path_to((-1,-1,-1), pred, dico)
         end_time = time.perf_counter()
         execution_time = end_time - start_time
 
         time_iter.loc[len(time_iter)]=[size,execution_time]
     return time_iter, chemin
 
-"""
-#À quoi ça sert?
+
 def draw_boxplot(time_iter, obstacle=False):
     if obstacle:
         fig = px.box(
             time_iter,
             x="N",
             y="time",
-            title="Temps d'execution en fonction du nombre d'obstacles",
+            title="Temps d'exécution en fonction du nombre d'obstacles",
+            log_y=True
         )
     else:
         fig = px.box(
             time_iter,
             x="N",
             y="time",
-            title="Temps d'execution en fonction de la taille de la grille",
+            title="Temps d'exécution en fonction de la taille de la grille",
+            log_y=True
         )
+    #Affiche le graphique dans un navigateur
     fig.show()
-"""
     
 def create_output_file(file_path, chemin):
-    file = os.path.basename(file_path)
-    with open(file, "w") as f:
+    """
+    Créer un fichier avec tous les plus cours chemins
+    
+    Args:
+        nom_fichier (str): chemin vers le fichier
+        chemin (list): list de str
+    """
+    with open(file_path, "w") as f:
         for row in chemin:
             f.write(f"{row} \n")
 
 # ================ Main ====================
 if __name__=="__main__":
     
+    #Exemple de l'énoncé
     matrix,start_node,end_node=read_matrix("input_file.txt")[0]
     Mres=create_accessibility_matrix(matrix)
     dico=create_adjacency_dictionnary(Mres,end_node)
@@ -324,10 +443,17 @@ if __name__=="__main__":
     path=get_path_to((-1,-1,-1),pred,dico)
     print(get_path_textual(path))
 
-    grilles_obstacles=read_matrix("input_file_test_obstacle.txt")
+    #Tests sur le nombre d'obstacles
+    create_file_test("./tests/input_file_test_obstacle.txt",obstacle=True)
+    grilles_obstacles=read_matrix("./tests/input_file_test_obstacle.txt")
     time_iter_obstacle,chemin_obstacle=get_time_iter(grilles_obstacles,obstacles=True)
-    create_output_file("output_file_test_obstacle.txt",chemin_obstacle)
-
-    grilles_size=read_matrix("input_file_test_size.txt")
+    create_output_file("./tests/output_file_test_obstacle.txt",chemin_obstacle)
+    draw_boxplot(time_iter_obstacle,obstacle=True)
+    
+    #Tests sur la taille des matrices
+    create_file_test("./tests/input_file_test_size.txt",obstacle=False)
+    grilles_size=read_matrix("./tests/input_file_test_size.txt")
     time_iter_size,chemin_size=get_time_iter(grilles_size,obstacles=False)
-    create_output_file("output_file_test_size.txt",chemin_size)
+    create_output_file("./tests/output_file_test_size.txt",chemin_size)
+    draw_boxplot(time_iter_size,obstacle=False)
+    

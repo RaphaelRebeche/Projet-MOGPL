@@ -8,19 +8,28 @@ class BadArgument(Exception):
     pass
 
 if __name__=="__main__":
-    print(sys.argv)
     try:
+        if (len(sys.argv)<2):
+            raise BadArgument("Mauvais arguments. Essayez -h pour voir la syntaxe")
+        
         if sys.argv[1]=="-h":
             print("main.py m n p\n" \
-            "m  (int) : nombre de lignes\n" \
-            "n  (int) : nombre de colonnes\n" \
-            "p  (int) : nombre d'obstacles\n")
-        
+            "Args:\n" \
+            "m  (int): nombre de lignes\n" \
+            "n  (int): nombre de colonnes\n" \
+            "p  (int): nombre d'obstacles\n" \
+            "Ou -t input_path output_path: pour écrire la réponse des matrices du fichier input_path dans output_path")
+
+        elif sys.argv[1]=="-t":
+                grilles_size=utils.read_matrix(sys.argv[2])
+                _,chemin_size=utils.get_time_iter(grilles_size,obstacles=False)
+                utils.create_output_file(sys.argv[3],chemin_size)
+
         elif len(sys.argv)==4:
             m,n,p=sys.argv[1:]
             m,n,p=int(m),int(n),int(p)
             
-            matrices=np.array(PL.gen_matrix(m,n,p))
+            matrices=np.array(PL.gen_matrices(m,n,p))
             print(f"\nModèle valide : {len(matrices)} solution(s) optimale(s) trouvée(s) avec les paramètres ({n},{m},{p})")
             dx,dy,o="","",""
            
@@ -57,7 +66,7 @@ if __name__=="__main__":
                         if utils.is_accessible(dx, dy, matrix) and utils.is_accessible(fx, fy, matrix):
                             possible_solutions.append(i)
                         elif i==len(matrices)-1:
-                            raise Exception("Un des points de début ou de fin n'est pas accessible dans aucune des {len(matrices)} solutions.\n" \
+                            raise Exception(f"Un des points de début ou de fin n'est pas accessible dans aucune des {len(matrices)} solutions.\n" \
                                             "Essayer avec d'autres points")
                 except Exception as e:
                     print(e)
@@ -82,6 +91,9 @@ if __name__=="__main__":
                 print(f"Solution optimale n°{res[0]} du modèle ({m},{n},{p}) : {res[1]}")
         else:
             raise BadArgument("Mauvais arguments. Essayez -h pour voir la syntaxe")
-    except Exception:
-        print(traceback.format_exc())
+    except Exception as e:
+        if isinstance(e,BadArgument):
+            print(e)
+        else:
+            print(traceback.format_exc())
         

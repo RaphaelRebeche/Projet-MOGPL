@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import time
 import os
+import plotly.express as px
 
 class NoPathFoundError(Exception):
     def __init__(self,message):
@@ -33,6 +34,121 @@ def create_accessibility_matrix(M):
         numpy.ndarray: Où les 1 représentent là où le robot peut marcher
     """
     return np.array([[is_accessible(i,j,M) for j in range(M.shape[1]+1)]for i in range(M.shape[0]+1)],dtype=int)
+
+ def create_random_matrix_start_end(N=20, P_obstacle=False):
+        """
+    Renvoie une matrice carré de 0 et 1 placés aléatoirement et une liste avec le point de départ, son orientation et le point d'arrivée
+
+    Args:
+    N(int): la taille d'un côté ou le nombre d’obstacles
+    P_obstacle(bool): True => N est la taille d'un côté, False => N est le nombre d'obstacles
+
+    Return:
+    matrix (2D list): matrice de 0 et 1 pour les obstacles
+    start_end (list): coordonée des point de départ (avec orientation) et sortie
+    """
+    
+    # Creation de la matrice aleatoire =================================================
+    if not P_obstacle:  # pour test en fonction de la taille ------------
+        matrix = np.eye(N, dtype=int).flatten()
+
+    else:  # pour le test en fonction du nombre d'obstacles -------------
+        matrice_obstacles = np.arange(P_obstacle) * 0 + 1
+        matrice_accessible = np.arange(N**2 - P_obstacle) * 0
+        matrix = np.hstack([matrice_obstacles, matrice_accessible])
+
+    np.random.shuffle(matrix)
+    matrix = matrix.reshape(N, N)
+
+    # Creation du point start ==========================================================
+    start = [
+        np.random.randint(1, N + 1),
+        np.random.randint(1, N + 1),
+    ]
+    while not is_accessible(
+        start[0], start[1], matrix
+    ):  # verification absence d'obstacle sur start ---------------------
+        start = [
+            np.random.randint(1, N + 1),
+            np.random.randint(1, N + 1),
+        ]
+
+    # Creation du point stop ===========================================================
+    end = [np.random.randint(1, N + 1), np.random.randint(1, N + 1)]
+    while (
+        end == start or not is_accessible(end[0], end[1], matrix) == 1
+    ):  # verification absence d'obstacle sur stop et stop != start-------
+        end = [np.random.randint(1, N + 1), np.random.randint(1, N + 1)]
+
+    # Ajout de l'orientation ===========================================================
+    deux_points = np.hstack([start, end])
+    ori = np.random.randint(0, 4)
+
+    # converstion de 0,1,2,3 en nord, ouest, sud, est---------------------
+    if ori == 0:
+        ori = "nord"
+    elif ori == 1:
+        ori = "ouest"
+    elif ori == 2:
+        ori = "sud"
+    elif ori == 3:
+        ori = "est"
+    else:
+        return f"mauvaise valeure pour la direction N/S/E/O : ori = {ori}"
+
+    start_end = np.hstack([deux_points, ori])
+
+    return matrix, start_end
+
+
+def append_matrix_to_file(matrix, start_end, file_name):
+    """
+    Ajoute une matrice à un fichier d'entrée
+
+    Args:
+    matrix (2D list): matrice de 0 et 1 pour les obstacles
+    start_end (list): coordonée des point de départ (avec orientation) et sortie
+    """
+    n = len(matrix)
+    with open(file_name, "a") as f:
+        # ajout dimension fichier
+        f.write(f"{n} {n}\n")
+        # ajout matrice ligne à ligne
+        for row in matrix:
+            f.write(" ".join(map(str, row)) + "\n")
+
+        # ajout position
+        f.write(" ".join(map(str, start_end)) + "\n")
+
+        # ajout 0 0 final
+        f.write("0 0\n")
+
+
+def create_file_test(obstacle=False):
+    """
+    Créer un fichier avec toutes les matrices de tests
+    Args :
+    obstacle(bool) : idem que create_random_matric_start_end
+    """
+    sizes = np.arange(1, 6) * 10
+    for N in sizes:
+        for _ in range(10):
+            if not obstacle:
+                random_matrix, random_points = create_random_matrix_start_end(N)
+                append_matrix_to_file(
+                    random_matrix, random_points, file_name="input_file_test_size.txt"
+                )
+
+            else:
+                random_matrix, random_points = create_random_matrix_start_end(
+                    P_obstacle=N,
+                )
+                append_matrix_to_file(
+                    random_matrix,
+                    random_points,
+                    file_name="input_file_test_obstacle.txt",
+                )
+
 
 def create_adjacency_dictionnary(accessibility_matrix,end_point):
     """
@@ -241,6 +357,17 @@ def read_matrix(nom_fichier):
     return grilles
 
 def get_time_iter(grilles, obstacles=False):
+    """
+    Renvoie une matrice du temps d'exécution en fonction de la grille d'entrée et une liste des plus courts chemin
+    
+    Args:
+        grilles (list): liste des grilles sous la forme[(numpy.ndarray,tuple,tuple)*]
+        obstacles (bool): indique si les grilles d'entrée permettent de tester la taille ou le nombre d'obstacles
+
+    Returns:
+        time_iter (DataFrame): deux colonnes "N" et "time"
+        chemin (list): list de str
+    """
     chemin = []
 
     time_iter = pd.DataFrame(columns=["N", "time"])
@@ -288,9 +415,15 @@ def get_time_iter(grilles, obstacles=False):
         time_iter.loc[len(time_iter)]=[size,execution_time]
     return time_iter, chemin
 
-"""
-#À quoi ça sert?
+
 def draw_boxplot(time_iter, obstacle=False):
+    """
+    Affiche les boxplots correspondant à chacune des valeurs de N dans le DataFrame d'entrée
+    
+    Args:
+        time_iter (DataFrame): deux colonnes "N" et "time"
+        obstacles (bool): indique si les grilles d'entrée permettent de tester la taille ou le nombre d'obstacles
+    """
     if obstacle:
         fig = px.box(
             time_iter,
@@ -306,9 +439,16 @@ def draw_boxplot(time_iter, obstacle=False):
             title="Temps d'execution en fonction de la taille de la grille",
         )
     fig.show()
-"""
+
     
 def create_output_file(file_path, chemin):
+    """
+    Créer un fichier avec tous les plus cours chemins
+    
+    Args:
+        nom_fichier (str): chemin vers le fichier
+        chemin (list): list de str
+    """
     file = os.path.basename(file_path)
     with open(file, "w") as f:
         for row in chemin:

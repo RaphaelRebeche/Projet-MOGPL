@@ -2,14 +2,24 @@
 
 ## Introduction
 Le rendu comporte trois fichiers python distinct.
-- <code>main.py</code> comporte le programme nécessaire à la mise en place d'un interface demandé en question (e).
+- <code>main.py</code> comporte le programme nécessaire à la mise en place d'une interface demandé en question (e).
 - <code>utils.py</code> comporte toutes les fonctions nécessaires à la réponse aux questions (a) à (d).
-- <code>PL.py</code> comporte les fonctions nécessaires à la résolution du PL de la question e.
+- <code>PL.py</code> comporte les fonctions nécessaires à la résolution du PL de la question (e).
+
+Ainsi que les répertoires <code>tests</code> et <code>tests_rendu</code> qui comportent les fichiers d'entrée et de sortie des tests (et les images du rendu pour le second répertoire). Ainsi que le fichier <code>input_file.txt</code> qui est le fichier qui comporte la matrice d'exemple de l'énoncé.
+
+### Bibliothèques externes
+Pour notre projet nous utilisons certaines bibliothèques non natives à python:
+- <code>gurobipy</code> pour faire appel à l'API de Gurobi.
+- <code>numpy</code> pour faciliter la création et les calculs sur des matrices.
+- <code>pandas</code> et <code>plotly</code> pour le calcul et l'affichage de graphiques sur la performance du programme.
 
 ## main.py
-- Se lance en rentrant dans un terminal <code>python(3) {path}/main.py m n p</code><br>
-Où <code>m</code>,<code>n</code> et <code>p</code> sont des entiers représentant le nombre de lignes, de colonnes et d'obstacles. Si le modèle est validé par le solveur, il vous sera demandé de rentrer 5 autres arguments <code>dx</code>, <code>dy</code>, <code>o</code>, <code>fx</code> et <code>fy</code>, séparés eux aussi par des espaces, où <code>dx</code>, <code>dy</code>, <code>fx</code> et <code>fy</code> sont des entiers représentant les lignes et les colonnes des poits de début et de fin et <code>o</code> une chaîne de caracère représentant un point cardinal (nord, ouest, sud, est, n, o, s, e et leurs variantes avec des majuscules sont également acceptées).<br>
-Si au moins un des deux points n'est pas accessibles dans aucunes des <code>n</code> solutions renvoyées par le solveur il est demandé de réessayer avec d'autres coordonnées (dans certains cas, trouver deux points accessibles peut s'avérer fastidieux).
+- Se lance en exécutant dans un terminal <code>python(3) {path}/main.py m n p</code><br>
+Où <code>m</code>,<code>n</code> et <code>p</code> sont des entiers représentant le nombre de lignes, de colonnes et d'obstacles. Si le modèle est validé par le solveur, il vous sera demandé de rentrer 5 autres arguments <code>dx</code>, <code>dy</code>, <code>o</code>, <code>fx</code> et <code>fy</code>, séparés eux aussi par des espaces, où <code>dx</code>, <code>dy</code>, <code>fx</code> et <code>fy</code> sont des entiers représentant les lignes et les colonnes des poits de début et de fin et <code>o</code> une chaîne de caracère représentant un point cardinal (nord, ouest, sud, est, n, o, s, e).<br>
+Si au moins un des deux points n'est pas accessibles dans aucunes des solutions renvoyées par le solveur il est demandé de réessayer avec d'autres coordonnées (dans certains cas, trouver deux points accessibles peut s'avérer fastidieux).<br>
+Quand les points seronts validés, le script affichera dans le terminal la progression des calculs des chemins puis toutes les solutions trouvées.
+- Ou en entrant le paramètre <code>-t input_path output_path</code> pour écrire la réponse des matrices du fichier <code>input_path</code> dans <code>output_path</code>.
 
 ## utils.py
 - Les fonctions is_accessible et create_accessibility_matrix permettent de déterminer, à partir d'une matrice d'obstable, si un point est accessible et d'en déduire la matrice d'accessibilité<br>

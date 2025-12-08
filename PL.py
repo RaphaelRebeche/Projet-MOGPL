@@ -1,15 +1,18 @@
 import gurobipy as gp
 from gurobipy import GRB
 import random
-import numpy as np
 
 def create_model(m,n,p):
     """
     Renvoie le modèle gurobipy
     
-    :param m: Nombre de lignes de la matrice
-    :param m: Nombre de colonnes de la matrice
-    :param p: Nombre d'obstacles de la matrice
+    Args:
+        m (int): Nombre de lignes de la matrice
+        n (int): Nombre de colonnes de la matrice
+        p (int): Nombre d'obstacles de la matrice
+    
+    Returns:
+        model: modèle gurobipy
     """
     model=gp.Model("opt")
 
@@ -58,14 +61,25 @@ def create_model(m,n,p):
     model.optimize()
     return model
 
-def gen_matrix(m,n,p):
+def gen_matrices(m,n,p):
+    """
+    Renvoie une liste de toutes les solutions trouvées pour un modèle
+    
+    Args:
+        m (int): Nombre de lignes de la matrice
+        n (int): Nombre de colonnes de la matrice
+        p (int): Nombre d'obstacles de la matrice
+
+    Returns:
+        matrices : liste des matrices
+    """
     model=create_model(m,n,p)
     if model.Status==GRB.OPTIMAL:
-        res=[]
+        matrices=[]
         for k in range(model.SolCount):
             model.Params.SolutionNumber=k#Solution k du problème
-            res.append([[int(model.getVarByName(f"a_{i}_{j}").Xn) for j in range(n)] for i in range(m)])
-        return res
+            matrices.append([[int(model.getVarByName(f"a_{i}_{j}").Xn) for j in range(n)] for i in range(m)])
+        return matrices
     raise Exception("Modèle irréalisable!")
 
 if __name__=="__main__":
